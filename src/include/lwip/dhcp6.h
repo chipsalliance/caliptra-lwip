@@ -69,7 +69,37 @@ struct dhcp6
   /** #ticks with period DHCP6_TIMER_MSECS for request timeout */
   u16_t request_timeout;
 #if LWIP_IPV6_DHCP6_STATEFUL
-  /* @todo: add more members here to keep track of stateful DHCPv6 data, like lease times */
+  /** Client DUID (DUID-LL: type(2) + hwtype(2) + hwaddr(NETIF_MAX_HWADDR_LEN)) */
+  u8_t duid[4 + NETIF_MAX_HWADDR_LEN];
+  u8_t duid_len;
+  /** Server DUID received in ADVERTISE */
+  u8_t server_duid[128];
+  u16_t server_duid_len;
+  /** Server preference from ADVERTISE */
+  u8_t server_pref;
+  /** IA_NA Identity Association ID */
+  u32_t ia_id;
+  /** Assigned IPv6 address from IA_NA */
+  ip6_addr_t ia_addr;
+  /** Lifetimes from IAADDR (seconds) */
+  u32_t preferred_lifetime;
+  u32_t valid_lifetime;
+  /** T1/T2 from IA_NA (seconds) */
+  u32_t t1;
+  u32_t t2;
+  /** Lease timers in DHCP6_TIMER_MSECS ticks */
+  u32_t t1_timeout;
+  u32_t t2_timeout;
+  u32_t lease_timeout;
+  /** Retransmission timeout in msecs (RFC 8415 §15) */
+  u32_t rt_msecs;
+  /** Elapsed time since start of current exchange in msecs */
+  u32_t elapsed_msecs;
+  /** Index of assigned address in netif, -1 if none */
+  s8_t addr_idx;
+  /** Boot file URL from Option 59 (RFC 5970), e.g. "tftp://[fd00::1]/boot.bin" */
+  char boot_file_url[128];
+  u8_t boot_file_url_len;
 #endif /* LWIP_IPV6_DHCP6_STATEFUL */
 };
 

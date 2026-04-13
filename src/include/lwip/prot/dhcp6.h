@@ -71,7 +71,14 @@ PACK_STRUCT_END
 typedef enum {
   DHCP6_STATE_OFF               = 0,
   DHCP6_STATE_STATELESS_IDLE    = 1,
-  DHCP6_STATE_REQUESTING_CONFIG = 2
+  DHCP6_STATE_REQUESTING_CONFIG = 2,
+  /* Stateful DHCPv6 states (RFC 8415) */
+  DHCP6_STATE_STATEFUL_IDLE     = 3,
+  DHCP6_STATE_SOLICITING        = 4,
+  DHCP6_STATE_REQUESTING        = 5,
+  DHCP6_STATE_BOUND             = 6,
+  DHCP6_STATE_RENEWING          = 7,
+  DHCP6_STATE_REBINDING         = 8
 } dhcp6_state_enum_t;
 
 /* DHCPv6 message types */
@@ -129,6 +136,9 @@ typedef enum {
 #define DHCP6_OPTION_DNS_SERVERS    23 /* RFC 3646 */
 #define DHCP6_OPTION_DOMAIN_LIST    24 /* RFC 3646 */
 #define DHCP6_OPTION_SNTP_SERVERS   31 /* RFC 4075 */
+#define DHCP6_OPTION_BOOTFILE_URL   59 /* RFC 5970 */
+#define DHCP6_OPTION_BOOTFILE_PARAM 60 /* RFC 5970 */
+#define DHCP6_OPTION_SOL_MAX_RT     82 /* RFC 8415 */
 
 
 #ifdef __cplusplus
