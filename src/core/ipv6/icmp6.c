@@ -54,6 +54,7 @@
 #include "lwip/mld6.h"
 #include "lwip/ip.h"
 #include "lwip/stats.h"
+#include "lwip/sys.h"
 
 #include <string.h>
 
@@ -61,6 +62,41 @@
 #undef LWIP_ICMP6_DATASIZE
 #define LWIP_ICMP6_DATASIZE   (IP6_MIN_MTU_LENGTH - IP6_HLEN - ICMP6_HLEN)
 #endif
+
+#if LWIP_ICMP6_ERR_RATELIMIT
+#if (LWIP_ICMP6_ERR_RATELIMIT_BURST == 0) || (LWIP_ICMP6_ERR_RATELIMIT_RATE == 0)
+#error "ICMPv6 error rate-limit burst and rate must be greater than zero"
+#endif
+#define ICMP6_ERR_RATELIMIT_SCALE       1000U
+#define ICMP6_ERR_RATELIMIT_CAPACITY    (LWIP_ICMP6_ERR_RATELIMIT_BURST * ICMP6_ERR_RATELIMIT_SCALE)
+static u32_t icmp6_err_ratelimit_tokens = ICMP6_ERR_RATELIMIT_CAPACITY;
+static u32_t icmp6_err_ratelimit_last;
+
+static int
+icmp6_err_ratelimit_allow(void)
+{
+  u32_t now = sys_now();
+  u32_t elapsed = now - icmp6_err_ratelimit_last;
+
+  if (icmp6_err_ratelimit_tokens < ICMP6_ERR_RATELIMIT_CAPACITY) {
+    u32_t refill_time = ICMP6_ERR_RATELIMIT_CAPACITY / LWIP_ICMP6_ERR_RATELIMIT_RATE;
+    if (elapsed >= refill_time) {
+      icmp6_err_ratelimit_tokens = ICMP6_ERR_RATELIMIT_CAPACITY;
+    } else {
+      icmp6_err_ratelimit_tokens = LWIP_MIN(
+        icmp6_err_ratelimit_tokens + (elapsed * LWIP_ICMP6_ERR_RATELIMIT_RATE),
+        ICMP6_ERR_RATELIMIT_CAPACITY);
+    }
+  }
+  icmp6_err_ratelimit_last = now;
+
+  if (icmp6_err_ratelimit_tokens < ICMP6_ERR_RATELIMIT_SCALE) {
+    return 0;
+  }
+  icmp6_err_ratelimit_tokens -= ICMP6_ERR_RATELIMIT_SCALE;
+  return 1;
+}
+#endif /* LWIP_ICMP6_ERR_RATELIMIT */
 
 /* Forward declarations */
 static void icmp6_send_response(struct pbuf *p, u8_t code, u32_t data, u8_t type);
@@ -388,6 +424,13 @@ icmp6_send_response_with_addrs_and_netif(struct pbuf *p, u8_t code, u32_t data, 
   struct pbuf *q;
   struct icmp6_hdr *icmp6hdr;
   u16_t datalen = LWIP_MIN(p->tot_len, LWIP_ICMP6_DATASIZE);
+
+#if LWIP_ICMP6_ERR_RATELIMIT
+  if (!icmp6_err_ratelimit_allow()) {
+    ICMP6_STATS_INC(icmp6.drop);
+    return;
+  }
+#endif
 
   /* ICMPv6 header + datalen (as much of the offending packet as possible) */
   q = pbuf_alloc(PBUF_IP, sizeof(struct icmp6_hdr) + datalen,
