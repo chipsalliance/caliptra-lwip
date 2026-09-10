@@ -104,7 +104,7 @@ static struct ip6_reassdata *reassdatagrams;
 static u16_t ip6_reass_pbufcount;
 
 /* Forward declarations. */
-static void ip6_reass_free_complete_datagram(struct ip6_reassdata *ipr);
+static void ip6_reass_free_complete_datagram(struct ip6_reassdata *ipr, int send_icmp);
 #if IP_REASS_FREE_OLDEST
 static void ip6_reass_remove_oldest_datagram(struct ip6_reassdata *ipr, int pbufs_needed);
 #endif /* IP_REASS_FREE_OLDEST */
@@ -132,7 +132,7 @@ ip6_reass_tmr(void)
       /* get the next pointer before freeing */
       r = r->next;
       /* free the helper struct and all enqueued pbufs */
-      ip6_reass_free_complete_datagram(tmp);
+      ip6_reass_free_complete_datagram(tmp, 1);
      }
    }
 }
@@ -145,7 +145,7 @@ ip6_reass_tmr(void)
  * @param ipr datagram to free
  */
 static void
-ip6_reass_free_complete_datagram(struct ip6_reassdata *ipr)
+ip6_reass_free_complete_datagram(struct ip6_reassdata *ipr, int send_icmp)
 {
   struct ip6_reassdata *prev;
   u16_t pbufs_freed = 0;
@@ -154,7 +154,7 @@ ip6_reass_free_complete_datagram(struct ip6_reassdata *ipr)
   struct ip6_reass_helper *iprh;
 
 #if LWIP_ICMP6
-  if (ipr->p != NULL) {
+  if (send_icmp && (ipr->p != NULL)) {
     iprh = (struct ip6_reass_helper *)ipr->p->payload;
     if (iprh->start == 0) {
       /* The first fragment was received, send ICMP time exceeded. */
@@ -187,6 +187,9 @@ ip6_reass_free_complete_datagram(struct ip6_reassdata *ipr)
     }
   }
 #endif /* LWIP_ICMP6 */
+#if !LWIP_ICMP6
+  LWIP_UNUSED_ARG(send_icmp);
+#endif
 
   /* First, free all received pbufs.  The individual pbufs need to be released
      separately as they have not yet been chained */
@@ -257,7 +260,7 @@ ip6_reass_remove_oldest_datagram(struct ip6_reassdata *ipr, int pbufs_needed)
       return;
     }
     if (oldest != NULL) {
-      ip6_reass_free_complete_datagram(oldest);
+      ip6_reass_free_complete_datagram(oldest, 1);
     }
   } while (((ip6_reass_pbufcount + pbufs_needed) > IP_REASS_MAX_PBUFS) && (reassdatagrams != NULL));
 }
@@ -439,13 +442,13 @@ ip6_reass(struct pbuf *p)
       if (end > iprh_tmp->start) {
         /* fragment overlaps with following, throw away */
         IP6_FRAG_STATS_INC(ip6_frag.proterr);
-        goto nullreturn;
+        goto overlap;
       }
       if (iprh_prev != NULL) {
         if (start < iprh_prev->end) {
           /* fragment overlaps with previous, throw away */
           IP6_FRAG_STATS_INC(ip6_frag.proterr);
-          goto nullreturn;
+          goto overlap;
         }
       }
 #endif /* IP_REASS_CHECK_OVERLAP */
@@ -473,13 +476,14 @@ ip6_reass(struct pbuf *p)
       }
       break;
     } else if (start == iprh_tmp->start) {
-      /* received the same datagram twice: no need to keep the datagram */
-      goto nullreturn;
+      /* received an overlapping duplicate fragment */
+      IP6_FRAG_STATS_INC(ip6_frag.proterr);
+      goto overlap;
 #if IP_REASS_CHECK_OVERLAP
     } else if (start < iprh_tmp->end) {
       /* overlap: no need to keep the new datagram */
       IP6_FRAG_STATS_INC(ip6_frag.proterr);
-      goto nullreturn;
+      goto overlap;
 #endif /* IP_REASS_CHECK_OVERLAP */
     } else {
       /* Check if the fragments received so far have no gaps. */
@@ -679,6 +683,8 @@ ip6_reass(struct pbuf *p)
   /* the datagram is not (yet?) reassembled completely */
   return NULL;
 
+overlap:
+  ip6_reass_free_complete_datagram(ipr, 0);
 nullreturn:
   IP6_FRAG_STATS_INC(ip6_frag.drop);
   pbuf_free(p);
