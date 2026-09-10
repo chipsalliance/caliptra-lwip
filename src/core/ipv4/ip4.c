@@ -315,10 +315,8 @@ ip4_forward(struct pbuf *p, struct ip_hdr *iphdr, struct netif *inp)
   }
 #endif /* IP_FORWARD_ALLOW_TX_ON_RX_NETIF */
 
-  /* decrement TTL */
-  IPH_TTL_SET(iphdr, IPH_TTL(iphdr) - 1);
-  /* send ICMP if TTL == 0 */
-  if (IPH_TTL(iphdr) == 0) {
+  /* Expire packets before decrementing to prevent TTL underflow. */
+  if (IPH_TTL(iphdr) <= 1) {
     MIB2_STATS_INC(mib2.ipinhdrerrors);
 #if LWIP_ICMP
     /* Don't send ICMP messages in response to ICMP messages */
@@ -328,6 +326,7 @@ ip4_forward(struct pbuf *p, struct ip_hdr *iphdr, struct netif *inp)
 #endif /* LWIP_ICMP */
     return;
   }
+  IPH_TTL_SET(iphdr, IPH_TTL(iphdr) - 1);
 
   /* Incrementally update the IP checksum. */
   if (IPH_CHKSUM(iphdr) >= PP_HTONS(0xffffU - 0x100)) {
