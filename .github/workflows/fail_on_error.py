@@ -9,11 +9,13 @@ def codeql_sarif_contain_error(filename):
         s = json.load(f)
 
     for run in s.get('runs', []):
-        rules_metadata = run['tool']['driver']['rules']
-        if not rules_metadata:
-            rules_metadata = run['tool']['extensions'][0]['rules']
-
         for res in run.get('results', []):
+            tool_component = run['tool']['driver']
+            if 'rule' in res and 'toolComponent' in res['rule']:
+                component_index = res['rule']['toolComponent']['index']
+                tool_component = run['tool']['extensions'][component_index]
+            rules_metadata = tool_component.get('rules', [])
+
             if 'ruleIndex' in res:
                 rule_index = res['ruleIndex']
             elif 'rule' in res and 'index' in res['rule']:
