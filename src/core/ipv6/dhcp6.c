@@ -1067,15 +1067,19 @@ static void
 dhcp6_handle_stateful_reply(struct netif *netif, struct pbuf *p)
 {
   struct dhcp6 *dhcp6 = netif_dhcp6_data(netif);
+  u16_t srv_start;
+  u16_t srv_len;
 
-  /* Must have Server ID */
-  if (!dhcp6_option_given(dhcp6, DHCP6_OPTION_IDX_SERVER_ID)) {
-    LWIP_DEBUGF(DHCP6_DEBUG, ("dhcp6: REPLY missing Server ID\n"));
+  /* Stateful requests include a Client ID, so replies must echo it and
+     identify the responding server. */
+  if (!dhcp6_option_given(dhcp6, DHCP6_OPTION_IDX_SERVER_ID) ||
+      !dhcp6_option_given(dhcp6, DHCP6_OPTION_IDX_CLI_ID)) {
+    LWIP_DEBUGF(DHCP6_DEBUG, ("dhcp6: REPLY missing Client/Server ID\n"));
     return;
   }
 
   /* Verify Client ID matches */
-  if (dhcp6_option_given(dhcp6, DHCP6_OPTION_IDX_CLI_ID)) {
+  {
     u16_t cli_start = dhcp6_get_option_start(dhcp6, DHCP6_OPTION_IDX_CLI_ID);
     u16_t cli_len   = dhcp6_get_option_length(dhcp6, DHCP6_OPTION_IDX_CLI_ID);
     u8_t cli_buf[20];
@@ -1088,6 +1092,22 @@ dhcp6_handle_stateful_reply(struct netif *netif, struct pbuf *p)
     }
     if (memcmp(cli_buf, dhcp6->duid, cli_len) != 0) {
       LWIP_DEBUGF(DHCP6_DEBUG, ("dhcp6: REPLY client ID mismatch\n"));
+      return;
+    }
+  }
+
+  srv_start = dhcp6_get_option_start(dhcp6, DHCP6_OPTION_IDX_SERVER_ID);
+  srv_len = dhcp6_get_option_length(dhcp6, DHCP6_OPTION_IDX_SERVER_ID);
+  if ((srv_len < 2) || (srv_len > sizeof(dhcp6->server_duid))) {
+    LWIP_DEBUGF(DHCP6_DEBUG, ("dhcp6: REPLY invalid server ID length\n"));
+    return;
+  }
+  if (dhcp6->state != DHCP6_STATE_REBINDING) {
+    u8_t srv_buf[128];
+    if ((srv_len != dhcp6->server_duid_len) ||
+        (pbuf_copy_partial(p, srv_buf, srv_len, srv_start) != srv_len) ||
+        (memcmp(srv_buf, dhcp6->server_duid, srv_len) != 0)) {
+      LWIP_DEBUGF(DHCP6_DEBUG, ("dhcp6: REPLY server ID mismatch\n"));
       return;
     }
   }
@@ -1142,6 +1162,13 @@ dhcp6_handle_stateful_reply(struct netif *netif, struct pbuf *p)
       }
       return;
     }
+  }
+
+  if (dhcp6->state == DHCP6_STATE_REBINDING) {
+    if (pbuf_copy_partial(p, dhcp6->server_duid, srv_len, srv_start) != srv_len) {
+      return;
+    }
+    dhcp6->server_duid_len = srv_len;
   }
 
   /* Success — install address on netif */
@@ -1473,8 +1500,8 @@ dhcp6_parse_reply(struct pbuf *p, struct dhcp6 *dhcp6)
     op = (op_len[0] << 8) | op_len[1];
     len = (op_len[2] << 8) | op_len[3];
     offset = val_offset + len;
-    if (offset < val_offset) {
-      /* overflow */
+    if ((offset < val_offset) || (offset > offset_max)) {
+      /* overflow or option extends beyond the packet */
       return ERR_BUF;
     }
 
@@ -1605,8 +1632,16 @@ dhcp6_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *addr
 #if LWIP_IPV6_DHCP6_STATELESS
     /* in info-requesting state? */
     if (dhcp6->state == DHCP6_STATE_REQUESTING_CONFIG) {
-      dhcp6_set_state(dhcp6, DHCP6_STATE_STATELESS_IDLE, "dhcp6_recv");
-      dhcp6_handle_config_reply(netif, p);
+      /* Information-request does not include a Client ID. The reply must
+         identify its server and must not add a Client ID. */
+      if (!dhcp6_option_given(dhcp6, DHCP6_OPTION_IDX_SERVER_ID) ||
+          dhcp6_option_given(dhcp6, DHCP6_OPTION_IDX_CLI_ID) ||
+          (dhcp6_get_option_length(dhcp6, DHCP6_OPTION_IDX_SERVER_ID) < 2)) {
+        LWIP_DEBUGF(DHCP6_DEBUG, ("dhcp6: invalid identifiers in stateless REPLY\n"));
+      } else {
+        dhcp6_set_state(dhcp6, DHCP6_STATE_STATELESS_IDLE, "dhcp6_recv");
+        dhcp6_handle_config_reply(netif, p);
+      }
     } else
 #endif /* LWIP_IPV6_DHCP6_STATELESS */
     {
