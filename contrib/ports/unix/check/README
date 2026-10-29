@@ -6,3 +6,8 @@ Helper files to run lwIP unit tests on unix-like systems.
 3. Run `make check`
 4. Make sure all tests pass
 
+The unit-test configuration enables SNMP to test signed ASN.1 decoding at
+integer-width boundaries, across chained pbufs, and with invalid or truncated
+input. To run only this suite, use:
+
+    CK_RUN_SUITE="SNMP ASN.1" make check
