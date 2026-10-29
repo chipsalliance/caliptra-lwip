@@ -1776,6 +1776,7 @@ dhcp_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *addr,
   struct dhcp_msg *reply_msg = (struct dhcp_msg *)p->payload;
   u8_t msg_type;
   u8_t i;
+  u32_t cookie;
   struct dhcp_msg *msg_in;
 
   LWIP_UNUSED_ARG(arg);
@@ -1805,8 +1806,9 @@ dhcp_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *addr,
     LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE | LWIP_DBG_LEVEL_WARNING, ("not a DHCP reply message, but type %"U16_F"\n", (u16_t)reply_msg->op));
     goto free_pbuf_and_return;
   }
-  if (reply_msg->cookie != PP_HTONL(DHCP_MAGIC_COOKIE)) {
-    LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE | LWIP_DBG_LEVEL_WARNING, ("invalid DHCP magic cookie\n"));
+  if ((pbuf_copy_partial(p, &cookie, sizeof(cookie), DHCP_MSG_LEN) != sizeof(cookie)) ||
+      (cookie != PP_HTONL(DHCP_MAGIC_COOKIE))) {
+    LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE | LWIP_DBG_LEVEL_WARNING, ("invalid or truncated DHCP magic cookie\n"));
     goto free_pbuf_and_return;
   }
   /* iterate through hardware address and match against DHCP message */

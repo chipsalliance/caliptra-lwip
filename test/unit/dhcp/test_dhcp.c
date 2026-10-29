@@ -5,6 +5,7 @@
 #include "lwip/prot/dhcp.h"
 #include "lwip/etharp.h"
 #include "lwip/inet.h"
+#include "lwip/inet_chksum.h"
 #include "netif/ethernet.h"
 
 #if LWIP_ACD
@@ -1093,6 +1094,90 @@ START_TEST(test_dhcp_invalid_overload)
 }
 END_TEST
 
+static void
+test_dhcp_cookie(u16_t split, u16_t dhcp_len, int valid_cookie)
+{
+  u8_t packet[sizeof(dhcp_offer)];
+  const u16_t dhcp_offset = 42;
+  u16_t packet_len = dhcp_offset + dhcp_len;
+  u16_t first_len = dhcp_offset + split;
+  u16_t checksum;
+  u32_t xid;
+  struct pbuf *p;
+  ip4_addr_t zero;
+
+  tcase = TEST_NONE;
+  txpacket = 0;
+  ip4_addr_set_zero(&zero);
+  netif_add(&net_test, &zero, &zero, &zero, &net_test, testif_init, ethernet_input);
+  netif_set_link_up(&net_test);
+  netif_set_up(&net_test);
+  fail_unless(dhcp_start(&net_test) == ERR_OK);
+  fail_unless(txpacket == 1);
+
+  memcpy(packet, dhcp_offer, sizeof(packet));
+  xid = htonl(netif_dhcp_data(&net_test)->xid);
+  memcpy(&packet[46], &xid, sizeof(xid));
+  if (!valid_cookie) {
+    packet[dhcp_offset + DHCP_MSG_LEN] ^= 0xff;
+  }
+  packet[16] = (u8_t)((packet_len - 14) >> 8);
+  packet[17] = (u8_t)(packet_len - 14);
+  packet[38] = (u8_t)((dhcp_len + 8) >> 8);
+  packet[39] = (u8_t)(dhcp_len + 8);
+  packet[24] = packet[25] = 0;
+  checksum = inet_chksum(&packet[14], 20);
+  memcpy(&packet[24], &checksum, sizeof(checksum));
+
+  p = pbuf_alloc(PBUF_RAW, first_len, PBUF_RAM);
+  fail_unless(p != NULL);
+  fail_unless(pbuf_take(p, packet, first_len) == ERR_OK);
+  if (first_len < packet_len) {
+    struct pbuf *tail = pbuf_alloc(PBUF_RAW, packet_len - first_len, PBUF_RAM);
+    fail_unless(tail != NULL);
+    fail_unless(pbuf_take(tail, &packet[first_len], packet_len - first_len) == ERR_OK);
+    pbuf_cat(p, tail);
+  }
+  fail_unless(net_test.input(p, &net_test) == ERR_OK);
+
+  if (valid_cookie && (dhcp_len >= DHCP_OPTIONS_OFS)) {
+    fail_unless(netif_dhcp_data(&net_test)->state == DHCP_STATE_REQUESTING);
+    fail_unless(txpacket == 2);
+  } else {
+    fail_unless(netif_dhcp_data(&net_test)->state == DHCP_STATE_SELECTING);
+    fail_unless(txpacket == 1);
+  }
+  dhcp_stop(&net_test);
+  dhcp_cleanup(&net_test);
+  netif_remove(&net_test);
+}
+
+START_TEST(test_dhcp_cookie_chained_pbuf)
+{
+  const u16_t splits[] = {44, DHCP_MSG_LEN - 1, DHCP_MSG_LEN,
+    DHCP_MSG_LEN + 1, DHCP_MSG_LEN + 2, DHCP_MSG_LEN + 3, DHCP_OPTIONS_OFS};
+  size_t i;
+  LWIP_UNUSED_ARG(_i);
+
+  for (i = 0; i < LWIP_ARRAYSIZE(splits); i++) {
+    test_dhcp_cookie(splits[i], sizeof(dhcp_offer) - 42, 1);
+  }
+}
+END_TEST
+
+START_TEST(test_dhcp_cookie_invalid)
+{
+  u16_t len;
+  LWIP_UNUSED_ARG(_i);
+
+  test_dhcp_cookie(44, sizeof(dhcp_offer) - 42, 0);
+  test_dhcp_cookie(44, 44, 1);
+  for (len = DHCP_MSG_LEN; len < DHCP_OPTIONS_OFS; len++) {
+    test_dhcp_cookie(44, len, 1);
+  }
+}
+END_TEST
+
 /** Create the suite including all tests for this module */
 Suite *
 dhcp_suite(void)
@@ -1102,7 +1187,9 @@ dhcp_suite(void)
     TESTFUNC(test_dhcp_nak),
     TESTFUNC(test_dhcp_relayed),
     TESTFUNC(test_dhcp_nak_no_endmarker),
-    TESTFUNC(test_dhcp_invalid_overload)
+    TESTFUNC(test_dhcp_invalid_overload),
+    TESTFUNC(test_dhcp_cookie_chained_pbuf),
+    TESTFUNC(test_dhcp_cookie_invalid)
   };
   return create_suite("DHCP", tests, sizeof(tests)/sizeof(testfunc), dhcp_setup, dhcp_teardown);
 }
