@@ -64,10 +64,16 @@
 #endif
 
 #if LWIP_ICMP6_ERR_RATELIMIT
-#if (LWIP_ICMP6_ERR_RATELIMIT_BURST == 0) || (LWIP_ICMP6_ERR_RATELIMIT_RATE == 0)
+#if (LWIP_ICMP6_ERR_RATELIMIT_BURST <= 0) || (LWIP_ICMP6_ERR_RATELIMIT_RATE <= 0)
 #error "ICMPv6 error rate-limit burst and rate must be greater than zero"
 #endif
 #define ICMP6_ERR_RATELIMIT_SCALE       1000U
+#if LWIP_ICMP6_ERR_RATELIMIT_BURST > (0xffffffffU / ICMP6_ERR_RATELIMIT_SCALE)
+#error "ICMPv6 error rate-limit burst exceeds the 32-bit token capacity"
+#endif
+#if LWIP_ICMP6_ERR_RATELIMIT_RATE > 0xffffffffU
+#error "ICMPv6 error rate-limit rate exceeds the 32-bit refill range"
+#endif
 #define ICMP6_ERR_RATELIMIT_CAPACITY    (LWIP_ICMP6_ERR_RATELIMIT_BURST * ICMP6_ERR_RATELIMIT_SCALE)
 static u32_t icmp6_err_ratelimit_tokens = ICMP6_ERR_RATELIMIT_CAPACITY;
 static u32_t icmp6_err_ratelimit_last;
@@ -79,13 +85,14 @@ icmp6_err_ratelimit_allow(void)
   u32_t elapsed = now - icmp6_err_ratelimit_last;
 
   if (icmp6_err_ratelimit_tokens < ICMP6_ERR_RATELIMIT_CAPACITY) {
-    u32_t refill_time = ICMP6_ERR_RATELIMIT_CAPACITY / LWIP_ICMP6_ERR_RATELIMIT_RATE;
+    u32_t missing = ICMP6_ERR_RATELIMIT_CAPACITY - icmp6_err_ratelimit_tokens;
+    u32_t refill_time = missing / LWIP_ICMP6_ERR_RATELIMIT_RATE +
+      ((missing % LWIP_ICMP6_ERR_RATELIMIT_RATE) != 0);
     if (elapsed >= refill_time) {
       icmp6_err_ratelimit_tokens = ICMP6_ERR_RATELIMIT_CAPACITY;
     } else {
-      icmp6_err_ratelimit_tokens = LWIP_MIN(
-        icmp6_err_ratelimit_tokens + (elapsed * LWIP_ICMP6_ERR_RATELIMIT_RATE),
-        ICMP6_ERR_RATELIMIT_CAPACITY);
+      /* Below refill_time, the product is smaller than the missing tokens. */
+      icmp6_err_ratelimit_tokens += elapsed * LWIP_ICMP6_ERR_RATELIMIT_RATE;
     }
   }
   icmp6_err_ratelimit_last = now;
