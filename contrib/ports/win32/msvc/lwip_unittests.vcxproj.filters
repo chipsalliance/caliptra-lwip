@@ -28,6 +28,9 @@
     <Filter Include="mqtt">
       <UniqueIdentifier>{fd48ae04-ec85-478f-a97c-a7c8384a2d94}</UniqueIdentifier>
     </Filter>
+    <Filter Include="snmp">
+      <UniqueIdentifier>{816b9f1f-e844-4e11-86ea-94784794ee78}</UniqueIdentifier>
+    </Filter>
     <Filter Include="ip4">
       <UniqueIdentifier>{fe93fc95-f1af-4a1f-a086-c1771dbf4d79}</UniqueIdentifier>
     </Filter>
@@ -75,6 +78,9 @@
     </ClCompile>
     <ClCompile Include="..\..\..\..\test\unit\mqtt\test_mqtt.c">
       <Filter>mqtt</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\test\unit\snmp\test_snmp_asn1.c">
+      <Filter>snmp</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\test\unit\ip4\test_ip4.c">
       <Filter>ip4</Filter>
@@ -139,6 +145,9 @@
     </ClInclude>
     <ClInclude Include="..\..\..\..\test\unit\mqtt\test_mqtt.h">
       <Filter>mqtt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\test\unit\snmp\test_snmp_asn1.h">
+      <Filter>snmp</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\test\unit\ip4\test_ip4.h">
       <Filter>ip4</Filter>

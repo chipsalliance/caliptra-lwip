@@ -45,10 +45,10 @@ TESTFILES=$(TESTDIR)/lwip_unittests.c \
 	$(TESTDIR)/ip6/test_ip6.c \
 	$(TESTDIR)/mdns/test_mdns.c \
 	$(TESTDIR)/mqtt/test_mqtt.c \
+	$(TESTDIR)/snmp/test_snmp_asn1.c \
 	$(TESTDIR)/tcp/tcp_helper.c \
 	$(TESTDIR)/tcp/test_tcp_oos.c \
 	$(TESTDIR)/tcp/test_tcp_state.c \
 	$(TESTDIR)/tcp/test_tcp.c \
 	$(TESTDIR)/udp/test_udp.c \
 	$(TESTDIR)/ppp/test_pppos.c
-

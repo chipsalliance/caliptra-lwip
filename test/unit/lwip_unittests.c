@@ -16,6 +16,7 @@
 #include "dhcp/test_dhcp.h"
 #include "mdns/test_mdns.h"
 #include "mqtt/test_mqtt.h"
+#include "snmp/test_snmp_asn1.h"
 #include "api/test_sockets.h"
 #include "ppp/test_pppos.h"
 
@@ -97,6 +98,7 @@ int main(void)
     dhcp_suite,
     mdns_suite,
     mqtt_suite,
+    snmp_asn1_suite,
     sockets_suite
 #if PPP_SUPPORT && PPPOS_SUPPORT
     , pppos_suite

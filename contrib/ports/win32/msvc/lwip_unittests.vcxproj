@@ -167,6 +167,7 @@
     <ClCompile Include="..\..\..\..\test\unit\ip6\test_ip6.c" />
     <ClCompile Include="..\..\..\..\test\unit\mdns\test_mdns.c" />
     <ClCompile Include="..\..\..\..\test\unit\mqtt\test_mqtt.c" />
+    <ClCompile Include="..\..\..\..\test\unit\snmp\test_snmp_asn1.c" />
     <ClCompile Include="..\..\..\..\test\unit\ppp\test_pppos.c" />
     <ClCompile Include="..\..\..\..\test\unit\tcp\tcp_helper.c" />
     <ClCompile Include="..\..\..\..\test\unit\tcp\test_tcp.c" />
@@ -190,6 +191,7 @@
     <ClInclude Include="..\..\..\..\test\unit\ip6\test_ip6.h" />
     <ClInclude Include="..\..\..\..\test\unit\mdns\test_mdns.h" />
     <ClInclude Include="..\..\..\..\test\unit\mqtt\test_mqtt.h" />
+    <ClInclude Include="..\..\..\..\test\unit\snmp\test_snmp_asn1.h" />
     <ClInclude Include="..\..\..\..\test\unit\ppp\test_pppos.h" />
     <ClInclude Include="..\..\..\..\test\unit\tcp\tcp_helper.h" />
     <ClInclude Include="..\..\..\..\test\unit\tcp\test_tcp.h" />
