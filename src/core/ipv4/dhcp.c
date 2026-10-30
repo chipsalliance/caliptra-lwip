@@ -1558,6 +1558,9 @@ again:
   if (q == NULL) {
     return ERR_BUF;
   }
+  if (q->payload == NULL) {
+    return ERR_BUF;
+  }
   offset = options_idx;
   offset_max = options_idx_max;
   options = (u8_t *)q->payload;
@@ -1576,7 +1579,10 @@ again:
     if ((offset + 1) < q->len) {
       len = options[offset + 1];
     } else {
-      len = (q->next != NULL ? ((u8_t *)q->next->payload)[0] : 0);
+      len = ((q->next != NULL) && (q->next->payload != NULL) ? ((u8_t *)q->next->payload)[0] : 0);
+    }
+    if ((op != DHCP_OPTION_PAD) && ((val_offset > offset_max) || (len > (offset_max - val_offset)))) {
+      return ERR_BUF;
     }
     /* LWIP_DEBUGF(DHCP_DEBUG, ("msg_offset=%"U16_F", q->len=%"U16_F"\n", msg_offset, q->len)); */
     decode_len = len;
@@ -1662,7 +1668,9 @@ again:
         u32_t value = 0;
         u16_t copy_len;
 decode_next:
-        LWIP_ASSERT("check decode_idx", decode_idx >= 0 && decode_idx < DHCP_OPTION_IDX_MAX);
+  LWIP_DHCP_INPUT_ERROR("check decode_idx",
+            decode_idx >= 0 && decode_idx < DHCP_OPTION_IDX_MAX,
+            return ERR_VAL;);
         if (!dhcp_option_given(dhcp, decode_idx)) {
           copy_len = LWIP_MIN(decode_len, 4);
           if (pbuf_copy_partial(q, &value, copy_len, val_offset) != copy_len) {
@@ -1700,6 +1708,7 @@ decode_next:
       if (offset < offset_max) {
         q = q->next;
         LWIP_DHCP_INPUT_ERROR("next pbuf was null", q != NULL, return ERR_VAL;);
+        LWIP_DHCP_INPUT_ERROR("next pbuf payload was null", q->payload != NULL, return ERR_VAL;);
         options = (u8_t *)q->payload;
       } else {
         /* We've run out of bytes, probably no end marker. Don't proceed. */
@@ -1767,6 +1776,7 @@ dhcp_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *addr,
   struct dhcp_msg *reply_msg = (struct dhcp_msg *)p->payload;
   u8_t msg_type;
   u8_t i;
+  u32_t cookie;
   struct dhcp_msg *msg_in;
 
   LWIP_UNUSED_ARG(arg);
@@ -1794,6 +1804,11 @@ dhcp_recv(void *arg, struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *addr,
 
   if (reply_msg->op != DHCP_BOOTREPLY) {
     LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE | LWIP_DBG_LEVEL_WARNING, ("not a DHCP reply message, but type %"U16_F"\n", (u16_t)reply_msg->op));
+    goto free_pbuf_and_return;
+  }
+  if ((pbuf_copy_partial(p, &cookie, sizeof(cookie), DHCP_MSG_LEN) != sizeof(cookie)) ||
+      (cookie != PP_HTONL(DHCP_MAGIC_COOKIE))) {
+    LWIP_DEBUGF(DHCP_DEBUG | LWIP_DBG_TRACE | LWIP_DBG_LEVEL_WARNING, ("invalid or truncated DHCP magic cookie\n"));
     goto free_pbuf_and_return;
   }
   /* iterate through hardware address and match against DHCP message */
