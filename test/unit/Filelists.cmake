@@ -29,6 +29,7 @@ set(LWIP_TESTFILES
 	${LWIP_TESTDIR}/ip6/test_ip6.c
 	${LWIP_TESTDIR}/mdns/test_mdns.c
 	${LWIP_TESTDIR}/mqtt/test_mqtt.c
+	${LWIP_TESTDIR}/snmp/test_snmp_asn1.c
 	${LWIP_TESTDIR}/tcp/tcp_helper.c
 	${LWIP_TESTDIR}/tcp/test_tcp_oos.c
 	${LWIP_TESTDIR}/tcp/test_tcp_state.c

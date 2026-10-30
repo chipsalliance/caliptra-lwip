@@ -54,6 +54,9 @@
 /* Enable DHCP to test it */
 #define LWIP_DHCP                       1
 
+/* Enable SNMP for ASN.1 decoder tests. */
+#define LWIP_SNMP                       1
+
 /* Enable DNS, with random source port to avoid alloc in dns_init */
 #define LWIP_DNS                        1
 #define LWIP_DNS_SECURE (LWIP_DNS_SECURE_RAND_XID | LWIP_DNS_SECURE_RAND_SRC_PORT)

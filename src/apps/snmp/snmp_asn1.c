@@ -41,6 +41,8 @@
 
 #include "snmp_asn1.h"
 
+#include <string.h>
+
 #define PBUF_OP_EXEC(code) \
   if ((code) != ERR_OK) { \
     return ERR_BUF; \
@@ -459,19 +461,21 @@ err_t
 snmp_asn1_dec_s32t(struct snmp_pbuf_stream *pbuf_stream, u16_t len, s32_t *value)
 {
   u8_t data;
+  u32_t decoded;
 
   if ((len > 0) && (len < 5)) {
     PBUF_OP_EXEC(snmp_pbuf_stream_read(pbuf_stream, &data));
 
-    /* sign extension */
-    *value = (s8_t)data;
+    decoded = (data & 0x80U) ? 0xFFFFFFFFUL : 0;
+    decoded = (decoded << 8) | data;
     len--;
     /* shift in the remaining value */
     while (len > 0) {
       PBUF_OP_EXEC(snmp_pbuf_stream_read(pbuf_stream, &data));
-      *value = (*value << 8) | data;
+      decoded = (decoded << 8) | data;
       len--;
     }
+    SMEMCPY(value, &decoded, sizeof(decoded));
     return ERR_OK;
   }
 
