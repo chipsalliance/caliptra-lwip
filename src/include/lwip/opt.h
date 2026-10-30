@@ -2602,6 +2602,31 @@
 #if !defined LWIP_ICMP6_HL || defined __DOXYGEN__
 #define LWIP_ICMP6_HL                   255
 #endif
+
+/**
+ * LWIP_ICMP6_ERR_RATELIMIT==1: Rate-limit ICMPv6 error messages using a
+ * token bucket as recommended by RFC 4443 section 2.4(f).
+ */
+#if !defined LWIP_ICMP6_ERR_RATELIMIT || defined __DOXYGEN__
+#define LWIP_ICMP6_ERR_RATELIMIT        LWIP_ICMP6
+#endif
+
+/**
+ * LWIP_ICMP6_ERR_RATELIMIT_BURST: Maximum number of ICMPv6 error messages
+ * that may be sent in a burst. Must be between 1 and 4294967 so that
+ * the scaled token capacity fits in 32 bits.
+ */
+#if !defined LWIP_ICMP6_ERR_RATELIMIT_BURST || defined __DOXYGEN__
+#define LWIP_ICMP6_ERR_RATELIMIT_BURST  10
+#endif
+
+/**
+ * LWIP_ICMP6_ERR_RATELIMIT_RATE: Sustained ICMPv6 error rate in messages
+ * per second. Must be between 1 and 4294967295.
+ */
+#if !defined LWIP_ICMP6_ERR_RATELIMIT_RATE || defined __DOXYGEN__
+#define LWIP_ICMP6_ERR_RATELIMIT_RATE   10
+#endif
 /**
  * @}
  */
